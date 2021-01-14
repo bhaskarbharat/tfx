@@ -73,7 +73,7 @@ nodes {
               key: "bar"
               value {
                 field_value {
-                  double_value: 0.5
+                  string_value: "foo"
                 }
               }
             }

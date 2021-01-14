@@ -73,6 +73,7 @@ class Compiler(object):
 
       for property_name, property_value in tfx_node.exec_properties[
           importer_node.CUSTOM_PROPERTIES_KEY].items():
+        _check_custom_property_value_type(property_value)
         value_field = output_spec.artifact_spec.additional_custom_properties[
             property_name].field_value
         try:
@@ -192,6 +193,7 @@ class Compiler(object):
               output_spec.artifact_spec.additional_properties[prop_key]
               .field_value, prop_value)
         for prop_key, prop_value in value.additional_custom_properties.items():
+          _check_custom_property_value_type(prop_value)
           data_types_utils.set_metadata_value(
               output_spec.artifact_spec.additional_custom_properties[prop_key]
               .field_value, prop_value)
@@ -341,6 +343,9 @@ def _check_property_value_type(property_name: str,
                                property_value: types.Property,
                                artifact_type: metadata_store_pb2.ArtifactType):
   prop_value_type = data_types_utils.get_metadata_value_type(property_value)
+  if prop_value_type == metadata_store_pb2.DOUBLE:
+    raise NotImplementedError(
+        "Float values for artifact properties are not supported yet")
   if prop_value_type != artifact_type.properties[property_name]:
     raise TypeError(
         "Unexpected value type of property '{}' in output artifact '{}': "
@@ -350,3 +355,10 @@ def _check_property_value_type(property_name: str,
                 artifact_type.properties[property_name]),
             metadata_store_pb2.PropertyType.Name(prop_value_type),
             property_value))
+
+
+def _check_custom_property_value_type(property_value: types.Property):
+  prop_value_type = data_types_utils.get_metadata_value_type(property_value)
+  if prop_value_type == metadata_store_pb2.DOUBLE:
+    raise NotImplementedError(
+        "Float values for artifact custom properties are not supported yet")

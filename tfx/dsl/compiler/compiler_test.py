@@ -80,8 +80,17 @@ class CompilerTest(tf.test.TestCase, parameterized.TestCase):
     test_pipeline = self._get_test_pipeline_definition(iris_pipeline_async)
     importer = next(
         c for c in test_pipeline.components if compiler_utils.is_importer(c))
+    importer.exec_properties[importer_node.PROPERTIES_KEY]["split_names"] = 2
+    with self.assertRaisesRegex(TypeError, "Expected STRING but given INT"):
+      dsl_compiler.compile(test_pipeline)
+
+  def testCompileImporterAdditionalPropertyNotImplementedError(self):
+    dsl_compiler = compiler.Compiler()
+    test_pipeline = self._get_test_pipeline_definition(iris_pipeline_async)
+    importer = next(
+        c for c in test_pipeline.components if compiler_utils.is_importer(c))
     importer.exec_properties[importer_node.PROPERTIES_KEY]["split_names"] = 2.1
-    with self.assertRaisesRegex(TypeError, "Expected STRING but given DOUBLE"):
+    with self.assertRaises(NotImplementedError):
       dsl_compiler.compile(test_pipeline)
 
 if __name__ == "__main__":

@@ -39,6 +39,7 @@ from tfx.proto import trainer_pb2
 from tfx.types import Channel
 from tfx.types.standard_artifacts import Model
 from tfx.types.standard_artifacts import ModelBlessing
+from tfx.utils.dsl_utils import external_input
 
 _pipeline_name = 'penguin_local'
 
@@ -78,8 +79,10 @@ def _create_pipeline(pipeline_name: Text, pipeline_root: Text, data_root: Text,
                      metadata_path: Text, enable_tuning: bool,
                      beam_pipeline_args: List[Text]) -> pipeline.Pipeline:
   """Implements the penguin pipeline with TFX."""
+  examples = external_input(data_root)
+
   # Brings data into the pipeline or otherwise joins/converts training data.
-  example_gen = CsvExampleGen(input_base=data_root)
+  example_gen = CsvExampleGen(input=examples)
 
   # Computes statistics over data for visualization and example validation.
   statistics_gen = StatisticsGen(examples=example_gen.outputs['examples'])

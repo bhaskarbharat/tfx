@@ -54,8 +54,10 @@ follows.
    the sample below, where data_root contains the CSV file generated in step 2.
 
 ```python
+  examples = external_input(data_root)
+
   # Brings data into the pipeline or otherwise joins/converts training data.
-  example_gen = CsvExampleGen(input_base=data_root)
+  example_gen = CsvExampleGen(input=examples)
 ```
 
 4. Run the pipeline and copy all generated output from GCS to testdata. Output

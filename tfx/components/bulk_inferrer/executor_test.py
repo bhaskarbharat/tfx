@@ -80,9 +80,7 @@ class ExecutorTest(tf.test.TestCase):
         standard_component_specs.INFERENCE_RESULT_KEY: [self._inference_result],
     }
     self._output_dict_oe = {
-        standard_component_specs.OUTPUT_EXAMPLES_KEY: [
-            self._output_examples
-        ],
+        standard_component_specs.OUTPUT_EXAMPLES_KEY: [self._output_examples],
     }
 
     # Create exe properties.
@@ -144,7 +142,7 @@ class ExecutorTest(tf.test.TestCase):
 
   def testDoWithOutputExamplesAllSplits(self):
     self._exec_properties[standard_component_specs
-                          .OUTPUT_EXAMPLE_SPEC_KEY] = proto_utils.proto_to_json(
+                          .OUTPUT_EXAMPLES_KEY] = proto_utils.proto_to_json(
                               text_format.Parse(
                                   """
                 output_columns_spec {
@@ -173,7 +171,7 @@ class ExecutorTest(tf.test.TestCase):
                 example_splits: 'unlabelled'
             """, bulk_inferrer_pb2.DataSpec()))
     self._exec_properties[standard_component_specs
-                          .OUTPUT_EXAMPLE_SPEC_KEY] = proto_utils.proto_to_json(
+                          .OUTPUT_EXAMPLES_KEY] = proto_utils.proto_to_json(
                               text_format.Parse(
                                   """
                 output_columns_spec {

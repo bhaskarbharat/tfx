@@ -95,11 +95,14 @@ def _PartitionFn(
 @beam.typehints.with_input_types(Union[tf.train.Example,
                                        tf.train.SequenceExample, bytes])
 @beam.typehints.with_output_types(beam.pvalue.PDone)
-def _WriteSplit(example_split: beam.pvalue.PCollection,
-                output_split_path: Text) -> beam.pvalue.PDone:
+def _WriteSplit(
+    example_split: beam.pvalue.PCollection, output_split_path: Text,
+    num_instances_counter: beam.metrics.Metrics.DelegatingCounter
+) -> beam.pvalue.PDone:
   """Shuffles and writes output split as serialized records in TFRecord."""
 
   def _MaybeSerialize(x):
+    num_instances_counter.inc(1)
     if isinstance(x, (tf.train.Example, tf.train.SequenceExample)):
       return x.SerializeToString()
     return x
@@ -295,12 +298,14 @@ class BaseExampleGenExecutor(
     with self._make_beam_pipeline() as pipeline:
       example_splits = self.GenerateExamplesByBeam(pipeline, exec_properties)
 
+      num_instances_counter = beam.metrics.Metrics.counter(
+          'tfx.ExampleGen', 'num_instances')
       # pylint: disable=expression-not-assigned, no-value-for-parameter
       for split_name, example_split in example_splits.items():
         (example_split
          | 'WriteSplit[{}]'.format(split_name) >> _WriteSplit(
              artifact_utils.get_split_uri(output_dict[utils.EXAMPLES_KEY],
-                                          split_name)))
+                                          split_name), num_instances_counter))
       # pylint: enable=expression-not-assigned, no-value-for-parameter
 
     output_payload_format = exec_properties.get(utils.OUTPUT_DATA_FORMAT_KEY)

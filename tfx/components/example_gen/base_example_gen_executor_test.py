@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import os
 import apache_beam as beam
+from apache_beam.metrics.metric import MetricsFilter
 import tensorflow as tf
 
 from tfx.components.example_gen import base_example_gen_executor
@@ -85,13 +86,13 @@ class BaseExampleGenExecutorTest(tf.test.TestCase):
 
   def setUp(self):
     super(BaseExampleGenExecutorTest, self).setUp()
-    output_data_dir = os.path.join(
+    self._output_data_dir = os.path.join(
         os.environ.get('TEST_UNDECLARED_OUTPUTS_DIR', self.get_temp_dir()),
         self._testMethodName)
 
     # Create output dict.
     self._examples = standard_artifacts.Examples()
-    self._examples.uri = output_data_dir
+    self._examples.uri = self._output_data_dir
     self._output_dict = {utils.EXAMPLES_KEY: [self._examples]}
 
     self._train_output_file = os.path.join(self._examples.uri, 'train',
@@ -239,6 +240,28 @@ class BaseExampleGenExecutorTest(tf.test.TestCase):
         RuntimeError, 'Split by `partition_feature_name` is only supported '
         'for FORMAT_TF_EXAMPLE and FORMAT_TF_SEQUENCE_EXAMPLE payload format.'):
       example_gen.Do({}, self._output_dict, self._exec_properties)
+
+  def testWriteSplitCounter(self):
+    num_instances_counter = beam.metrics.Metrics.counter(
+        'test', 'num_inferences')
+
+    pipeline = beam.Pipeline()
+    _ = (
+        pipeline
+        | beam.Create(
+            [tf.train.Example(),
+             tf.train.Example(),
+             tf.train.Example()])
+        | base_example_gen_executor._WriteSplit(self._output_data_dir,
+                                                num_instances_counter))
+
+    run_result = pipeline.run()
+    run_result.wait_until_finish()
+
+    num_inferences = run_result.metrics().query(
+        MetricsFilter().with_name('num_inferences'))
+    self.assertTrue(num_inferences['counters'])
+    self.assertEqual(num_inferences['counters'][0].result, 3)
 
 
 if __name__ == '__main__':

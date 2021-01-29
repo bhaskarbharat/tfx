@@ -50,7 +50,6 @@ from tfx.utils import path_utils
 from tfx.utils import proto_utils
 from tfx_bsl.tfxio import tensor_adapter
 
-
 _TELEMETRY_DESCRIPTORS = ['Evaluator']
 
 
@@ -103,11 +102,11 @@ class Executor(base_executor.BaseExecutor):
     """
     if EXAMPLES_KEY not in input_dict:
       raise ValueError('EXAMPLES_KEY is missing from input dict.')
-    if MODEL_KEY not in input_dict:
-      raise ValueError('MODEL_KEY is missing from input dict.')
+    # if MODEL_KEY not in input_dict and EVAL_CONFIG_KEY not in exec_properties:
+    #   raise ValueError('MODEL_KEY is missing from input dict.')
     if EVALUATION_KEY not in output_dict:
       raise ValueError('EVALUATION_KEY is missing from output dict.')
-    if len(input_dict[MODEL_KEY]) > 1:
+    if MODEL_KEY in input_dict and len(input_dict[MODEL_KEY]) > 1:
       raise ValueError('There can be only one candidate model, there are %d.' %
                        (len(input_dict[MODEL_KEY])))
     if BASELINE_MODEL_KEY in input_dict and len(
@@ -148,20 +147,23 @@ class Executor(base_executor.BaseExecutor):
       tfma.verify_eval_config(eval_config)
       # Do not validate model when there is no thresholds configured. This is to
       # avoid accidentally blessing models when users forget to set thresholds.
-      run_validation = bool(tfma.metrics.metric_thresholds_from_metrics_specs(
-          eval_config.metrics_specs))
+      run_validation = bool(
+          tfma.metrics.metric_thresholds_from_metrics_specs(
+              eval_config.metrics_specs))
       if len(eval_config.model_specs) > 2:
         raise ValueError(
             """Cannot support more than two models. There are %d models in this
              eval_config.""" % (len(eval_config.model_specs)))
       # Extract model artifacts.
       for model_spec in eval_config.model_specs:
+        if model_spec.prediction_key:
+          # Model-agnostic evaluation.
+          continue
         if model_spec.is_baseline:
           model_uri = artifact_utils.get_single_uri(
               input_dict[BASELINE_MODEL_KEY])
         else:
-          model_uri = artifact_utils.get_single_uri(
-              input_dict[MODEL_KEY])
+          model_uri = artifact_utils.get_single_uri(input_dict[MODEL_KEY])
         if tfma.get_model_type(model_spec) == tfma.TF_ESTIMATOR:
           model_path = path_utils.eval_model_path(model_uri)
         else:
@@ -213,11 +215,11 @@ class Executor(base_executor.BaseExecutor):
       examples_list = []
       tensor_adapter_config = None
       # pylint: disable=expression-not-assigned
-      if tfma.is_batched_input(eval_shared_model, eval_config):
+      if not eval_shared_model or tfma.is_batched_input(eval_shared_model,
+                                                        eval_config):
         tfxio_factory = tfxio_utils.get_tfxio_factory_from_artifact(
             examples=[
-                artifact_utils.get_single_instance(
-                    input_dict[EXAMPLES_KEY])
+                artifact_utils.get_single_instance(input_dict[EXAMPLES_KEY])
             ],
             telemetry_descriptors=_TELEMETRY_DESCRIPTORS,
             schema=schema,
@@ -225,8 +227,7 @@ class Executor(base_executor.BaseExecutor):
         # TODO(b/161935932): refactor after TFXIO supports multiple patterns.
         for split in example_splits:
           file_pattern = io_utils.all_files_pattern(
-              artifact_utils.get_split_uri(input_dict[EXAMPLES_KEY],
-                                           split))
+              artifact_utils.get_split_uri(input_dict[EXAMPLES_KEY], split))
           tfxio = tfxio_factory(file_pattern)
           data = (
               pipeline
@@ -240,8 +241,7 @@ class Executor(base_executor.BaseExecutor):
       else:
         for split in example_splits:
           file_pattern = io_utils.all_files_pattern(
-              artifact_utils.get_split_uri(input_dict[EXAMPLES_KEY],
-                                           split))
+              artifact_utils.get_split_uri(input_dict[EXAMPLES_KEY], split))
           data = (
               pipeline
               | 'ReadFromTFRecord[%s]' % split >>
@@ -273,8 +273,7 @@ class Executor(base_executor.BaseExecutor):
       logging.info('No threshold configured, will not validate model.')
       return
     # Set up blessing artifact
-    blessing = artifact_utils.get_single_instance(
-        output_dict[BLESSING_KEY])
+    blessing = artifact_utils.get_single_instance(output_dict[BLESSING_KEY])
     blessing.set_string_custom_property(
         constants.ARTIFACT_PROPERTY_CURRENT_MODEL_URI_KEY,
         artifact_utils.get_single_uri(input_dict[MODEL_KEY]))
